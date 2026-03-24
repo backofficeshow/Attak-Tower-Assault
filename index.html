@@ -1,0 +1,578 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Attak — Tower Assault</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap" rel="stylesheet">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            image-rendering: pixelated;
+        }
+
+        body {
+            background: #000;
+            overflow: hidden;
+            font-family: 'Press Start 2P', monospace;
+            color: #fff;
+        }
+
+        #game-container {
+            position: relative;
+            width: 100vw;
+            height: 100vh;
+        }
+
+        #game-canvas {
+            display: block;
+            width: 100%;
+            height: 100%;
+            image-rendering: pixelated;
+        }
+
+        #scanlines {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            background: repeating-linear-gradient(
+                0deg,
+                rgba(0, 0, 0, 0.15) 0px,
+                rgba(0, 0, 0, 0.15) 1px,
+                transparent 1px,
+                transparent 3px
+            );
+            z-index: 10;
+        }
+
+        #ui-layer {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            z-index: 20;
+        }
+
+        #top-bar {
+            position: absolute;
+            top: 16px;
+            left: 50%;
+            transform: translateX(-50%);
+            display: flex;
+            gap: 24px;
+            align-items: center;
+            padding: 12px 20px;
+            background: #1a1a2e;
+            border: 4px solid #fff;
+            box-shadow: 
+                4px 4px 0 #000,
+                inset -4px -4px 0 #0f0f1a,
+                inset 4px 4px 0 #2a2a4e;
+            pointer-events: auto;
+        }
+
+        .stat-box {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .stat-label {
+            font-size: 8px;
+            color: #888;
+            text-transform: uppercase;
+        }
+
+        .stat-value {
+            font-size: 14px;
+            color: #fff;
+            text-shadow: 2px 2px 0 #000;
+        }
+
+        #tower-hp-bar {
+            width: 120px;
+            height: 16px;
+            background: #2d0a0a;
+            border: 2px solid #fff;
+            box-shadow: 2px 2px 0 #000;
+            overflow: hidden;
+        }
+
+        #tower-hp-fill {
+            height: 100%;
+            width: 100%;
+            background: repeating-linear-gradient(
+                90deg,
+                #ff0000 0px,
+                #ff0000 8px,
+                #aa0000 8px,
+                #aa0000 16px
+            );
+            transition: width 0.1s;
+        }
+
+        #gold-display {
+            color: #ffcc00;
+        }
+
+        #wave-display {
+            color: #00ff00;
+        }
+
+        #bottom-panel {
+            position: absolute;
+            bottom: 16px;
+            left: 50%;
+            transform: translateX(-50%);
+            display: flex;
+            gap: 12px;
+            padding: 12px 16px;
+            background: #1a1a2e;
+            border: 4px solid #fff;
+            box-shadow: 
+                4px 4px 0 #000,
+                inset -4px -4px 0 #0f0f1a,
+                inset 4px 4px 0 #2a2a4e;
+            pointer-events: auto;
+        }
+
+        .tower-card {
+            width: 90px;
+            padding: 10px;
+            background: #0f0f1a;
+            border: 4px solid #555;
+            cursor: pointer;
+            transition: none;
+            text-align: center;
+            box-shadow: 
+                4px 4px 0 #000,
+                inset -2px -2px 0 #000,
+                inset 2px 2px 0 #2a2a4e;
+        }
+
+        .tower-card:hover:not(.disabled) {
+            background: #1a1a3a;
+            border-color: #fff;
+            transform: translate(-2px, -2px);
+            box-shadow: 
+                6px 6px 0 #000,
+                inset -2px -2px 0 #000,
+                inset 2px 2px 0 #3a3a5e;
+        }
+
+        .tower-card.selected {
+            background: #2a2a5a;
+            border-color: #ffcc00;
+            box-shadow: 
+                4px 4px 0 #000,
+                0 0 20px #ffcc00,
+                inset -2px -2px 0 #000,
+                inset 2px 2px 0 #4a4a8e;
+        }
+
+        .tower-card.disabled {
+            opacity: 0.4;
+            cursor: not-allowed;
+        }
+
+        .tower-icon {
+            width: 40px;
+            height: 40px;
+            margin: 0 auto 8px;
+            border: 3px solid #fff;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 16px;
+            box-shadow: 2px 2px 0 #000;
+        }
+
+        .tower-card[data-type="laser"] .tower-icon {
+            background: #ff00ff;
+            box-shadow: 
+                2px 2px 0 #000,
+                0 0 10px #ff00ff;
+        }
+
+        .tower-card[data-type="cannon"] .tower-icon {
+            background: #ff8800;
+            box-shadow: 
+                2px 2px 0 #000,
+                0 0 10px #ff8800;
+        }
+
+        .tower-card[data-type="freeze"] .tower-icon {
+            background: #00ffff;
+            box-shadow: 
+                2px 2px 0 #000,
+                0 0 10px #00ffff;
+        }
+
+        .tower-card[data-type="lightning"] .tower-icon {
+            background: #ffff00;
+            box-shadow: 
+                2px 2px 0 #000,
+                0 0 10px #ffff00;
+        }
+
+        .tower-card[data-type="sniper"] .tower-icon {
+            background: #00ff00;
+            box-shadow: 
+                2px 2px 0 #000,
+                0 0 10px #00ff00;
+        }
+
+        .tower-name {
+            font-size: 8px;
+            margin-bottom: 6px;
+            color: #fff;
+            text-shadow: 1px 1px 0 #000;
+        }
+
+        .tower-cost {
+            font-size: 10px;
+            color: #ffcc00;
+            text-shadow: 1px 1px 0 #000;
+        }
+
+        .tower-stats {
+            font-size: 6px;
+            color: #888;
+            margin-top: 4px;
+        }
+
+        #side-stats {
+            position: absolute;
+            right: 16px;
+            top: 50%;
+            transform: translateY(-50%);
+            padding: 16px;
+            background: #1a1a2e;
+            border: 4px solid #fff;
+            box-shadow: 
+                4px 4px 0 #000,
+                inset -4px -4px 0 #0f0f1a,
+                inset 4px 4px 0 #2a2a4e;
+            text-align: center;
+            pointer-events: auto;
+        }
+
+        #kills-display {
+            font-size: 24px;
+            color: #ff4444;
+            text-shadow: 
+                2px 2px 0 #000,
+                -1px -1px 0 #aa0000;
+        }
+
+        #wave-progress {
+            font-size: 8px;
+            color: #888;
+            margin-top: 8px;
+        }
+
+        #game-overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.95);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            pointer-events: auto;
+            opacity: 0;
+            visibility: hidden;
+            z-index: 100;
+        }
+
+        #game-overlay.active {
+            opacity: 1;
+            visibility: visible;
+        }
+
+        #overlay-title {
+            font-family: 'Press Start 2P', monospace;
+            font-size: 32px;
+            margin-bottom: 24px;
+            text-transform: uppercase;
+            text-shadow: 
+                4px 4px 0 #000,
+                -2px -2px 0 #000,
+                2px -2px 0 #000,
+                -2px 2px 0 #000;
+        }
+
+        #overlay-title.victory {
+            color: #00ff00;
+            animation: blink 0.5s infinite;
+        }
+
+        #overlay-title.defeat {
+            color: #ff0000;
+        }
+
+        @keyframes blink {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.7; }
+        }
+
+        #overlay-subtitle {
+            font-size: 12px;
+            color: #888;
+            margin-bottom: 40px;
+        }
+
+        #restart-btn {
+            font-family: 'Press Start 2P', monospace;
+            font-size: 12px;
+            padding: 16px 32px;
+            background: #1a1a2e;
+            border: 4px solid #00ff00;
+            color: #00ff00;
+            cursor: pointer;
+            box-shadow: 
+                4px 4px 0 #000,
+                inset -4px -4px 0 #0f0f1a,
+                inset 4px 4px 0 #2a2a4e;
+            text-transform: uppercase;
+        }
+
+        #restart-btn:hover {
+            background: #00ff00;
+            color: #000;
+            box-shadow: 
+                4px 4px 0 #000,
+                0 0 20px #00ff00;
+        }
+
+        #start-overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: #000;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            pointer-events: auto;
+            z-index: 100;
+        }
+
+        #start-overlay.hidden {
+            display: none;
+        }
+
+        #game-title {
+            font-family: 'Press Start 2P', monospace;
+            font-size: 48px;
+            color: #ffcc00;
+            text-shadow: 
+                4px 4px 0 #ff8800,
+                8px 8px 0 #000;
+            margin-bottom: 24px;
+            letter-spacing: 8px;
+            animation: titleBob 1s ease-in-out infinite;
+        }
+
+        @keyframes titleBob {
+            0%, 100% { transform: translateY(0); }
+            50% { transform: translateY(-8px); }
+        }
+
+        #game-subtitle {
+            font-size: 12px;
+            color: #888;
+            margin-bottom: 48px;
+            letter-spacing: 4px;
+        }
+
+        #start-btn {
+            font-family: 'Press Start 2P', monospace;
+            font-size: 14px;
+            padding: 20px 48px;
+            background: #1a1a2e;
+            border: 4px solid #ffcc00;
+            color: #ffcc00;
+            cursor: pointer;
+            box-shadow: 
+                4px 4px 0 #000,
+                inset -4px -4px 0 #0f0f1a,
+                inset 4px 4px 0 #2a2a4e;
+            text-transform: uppercase;
+            animation: pulse 1s ease-in-out infinite;
+        }
+
+        #start-btn:hover {
+            background: #ffcc00;
+            color: #000;
+            animation: none;
+            box-shadow: 
+                4px 4px 0 #000,
+                0 0 30px #ffcc00;
+        }
+
+        @keyframes pulse {
+            0%, 100% { transform: scale(1); }
+            50% { transform: scale(1.05); }
+        }
+
+        #wave-announcement {
+            position: absolute;
+            top: 40%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            font-family: 'Press Start 2P', monospace;
+            font-size: 28px;
+            color: #ff0000;
+            text-shadow: 
+                3px 3px 0 #000,
+                -2px -2px 0 #000,
+                2px -2px 0 #000,
+                -2px 2px 0 #000;
+            opacity: 0;
+            pointer-events: none;
+            z-index: 50;
+        }
+
+        #wave-announcement.visible {
+            opacity: 1;
+            animation: waveFlash 0.5s ease-out;
+        }
+
+        @keyframes waveFlash {
+            0% { transform: translate(-50%, -50%) scale(2); opacity: 0; }
+            50% { opacity: 1; }
+            100% { transform: translate(-50%, -50%) scale(1); opacity: 1; }
+        }
+
+        #tooltip {
+            position: absolute;
+            padding: 8px 12px;
+            background: #1a1a2e;
+            border: 3px solid #ff0000;
+            font-size: 8px;
+            color: #ff0000;
+            pointer-events: none;
+            opacity: 0;
+            box-shadow: 3px 3px 0 #000;
+            z-index: 60;
+        }
+
+        #tooltip.visible {
+            opacity: 1;
+        }
+
+        .controls-hint {
+            position: absolute;
+            bottom: 80px;
+            font-size: 8px;
+            color: #555;
+            text-align: center;
+        }
+    </style>
+</head>
+<body>
+    <div id="game-container">
+        <canvas id="game-canvas"></canvas>
+        <div id="scanlines"></div>
+        
+        <div id="ui-layer">
+            <div id="top-bar">
+                <div class="stat-box">
+                    <span class="stat-label">Wave</span>
+                    <span class="stat-value" id="wave-display">1/100</span>
+                </div>
+                <div class="stat-box">
+                    <span class="stat-label">HP</span>
+                    <div id="tower-hp-bar">
+                        <div id="tower-hp-fill"></div>
+                    </div>
+                </div>
+                <div class="stat-box">
+                    <span class="stat-label">Gold</span>
+                    <span class="stat-value" id="gold-display">150</span>
+                </div>
+            </div>
+
+            <div id="side-stats">
+                <div id="kills-display">0</div>
+                <div id="wave-progress">KILLS</div>
+            </div>
+
+            <div id="bottom-panel">
+                <div class="tower-card" data-type="laser">
+                    <div class="tower-icon">⚡</div>
+                    <div class="tower-name">Laser</div>
+                    <div class="tower-cost">50g</div>
+                    <div class="tower-stats">Fast ATK</div>
+                </div>
+                <div class="tower-card" data-type="cannon">
+                    <div class="tower-icon">💥</div>
+                    <div class="tower-name">Cannon</div>
+                    <div class="tower-cost">100g</div>
+                    <div class="tower-stats">Splash!</div>
+                </div>
+                <div class="tower-card" data-type="freeze">
+                    <div class="tower-icon">❄</div>
+                    <div class="tower-name">Freeze</div>
+                    <div class="tower-cost">75g</div>
+                    <div class="tower-stats">Slow</div>
+                </div>
+                <div class="tower-card" data-type="lightning">
+                    <div class="tower-icon">⚡</div>
+                    <div class="tower-name">Lightning</div>
+                    <div class="tower-cost">80g</div>
+                    <div class="tower-stats">Stun!</div>
+                </div>
+                <div class="tower-card" data-type="sniper">
+                    <div class="tower-icon">🎯</div>
+                    <div class="tower-name">Sniper</div>
+                    <div class="tower-cost">150g</div>
+                    <div class="tower-stats">Long Range</div>
+                </div>
+            </div>
+
+            <div id="wave-announcement">WAVE 1</div>
+            <div id="tooltip"></div>
+            <div class="controls-hint">Click tower, then click map to place • ESC to cancel</div>
+        </div>
+
+        <div id="game-overlay">
+            <div id="overlay-title">VICTORY</div>
+            <div id="overlay-subtitle">All waves defeated!</div>
+            <button id="restart-btn">Play Again</button>
+        </div>
+
+        <div id="start-overlay">
+            <div id="game-title">ATTAK</div>
+            <div id="game-subtitle">TOWER ASSAULT</div>
+            <button id="start-btn">Start Game</button>
+        </div>
+    </div>
+
+    <script type="importmap">
+    {
+        "imports": {
+            "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
+            "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/"
+        }
+    }
+    </script>
+    <script type="module" src="game.js"></script>
+</body>
+</html>

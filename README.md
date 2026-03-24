@@ -6,7 +6,7 @@ A browser-based tower defense game built with Three.js. Defend your tower agains
 
 ```bash
 # Serve locally
-cd /mnt/extbod/localwork/tower
+cd /localfolder/tower
 python3 -m http.server 3000
 
 # Access at http://localhost:3000 or http://<your-ip>:3000

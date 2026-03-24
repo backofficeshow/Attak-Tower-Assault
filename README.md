@@ -2,6 +2,8 @@
 
 A browser-based tower defense game built with Three.js. Defend your tower against 100 waves of enemies by strategically placing defensive towers.
 
+Try it here: https://attak-tower-assault.andrew-ce0.workers.dev/
+
 ## Quick Start
 
 ```bash
